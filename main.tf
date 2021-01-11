@@ -6,54 +6,41 @@ resource "azurerm_virtual_network" "vnet" {
   tags                = var.tags
 }
 
-resource "azurerm_subnet" "subnet" {
-  count                = length(var.subnets)
-  name                 = "${substr(keys(var.subnets)[count.index], 3, -1)}-subnet"
-  resource_group_name  = var.resource_group_name
-  virtual_network_name = azurerm_virtual_network.vnet.name
-  address_prefixes     = values(var.subnets)[count.index]
-}
+module "subnet" {
+  source   = "./subnet"
+  for_each = local.subnets
 
-resource "azurerm_subnet_network_security_group_association" "subnet_nsg" {
-  count                     = length(var.subnets)
-  subnet_id                 = azurerm_subnet.subnet.*.id[count.index]
-  network_security_group_id = azurerm_network_security_group.nsg.*.id[count.index]
-}
-
-resource "azurerm_network_security_group" "nsg" {
-  count               = length(var.subnets)
-  name                = "${var.names.resource_group_type}-${var.names.product_name}-${substr(keys(var.subnets)[count.index], 3, -1)}-security-group"
-  location            = var.location
+  naming_rules        = var.naming_rules
   resource_group_name = var.resource_group_name
-  tags                = merge(var.tags, {subnet_type = lookup(local.subnet_types,substr(keys(var.subnets)[count.index], 3, -1))})
+  location            = var.location
+  names               = var.names
+  tags                = var.tags
+
+  virtual_network_name = azurerm_virtual_network.vnet.name
+  subnet_type          = each.key
+  cidrs                = each.value.cidrs
+
+  enforce_private_link_endpoint_network_policies = each.value.enforce_private_link_endpoint_network_policies
+  enforce_private_link_service_network_policies  = each.value.enforce_private_link_service_network_policies
+
+  service_endpoints = each.value.service_endpoints
+  delegations       = each.value.delegations
+
+  allow_internet_outbound = each.value.allow_internet_outbound
+  allow_lb_inbound        = each.value.allow_lb_inbound
+  allow_vnet_inbound      = each.value.allow_vnet_inbound
+  allow_vnet_outbound     = each.value.allow_vnet_outbound
 }
 
-resource "azurerm_network_security_rule" "deny_all_inbound" {
-  count                       = length(var.subnets)
-  name                        = "DenyAllInbound"
-  priority                    = 4096
-  direction                   = "Inbound"
-  access                      = "Deny"
-  protocol                    = "*"
-  source_port_range           = "*"
-  destination_port_range      = "*"
-  source_address_prefix       = "*"
-  destination_address_prefix  = "*"
-  resource_group_name         = var.resource_group_name
-  network_security_group_name = azurerm_network_security_group.nsg.*.name[count.index]
+resource "azurerm_virtual_network_peering" "peer" {
+  for_each                     = local.peers
+  name                         = each.key
+  resource_group_name          = var.resource_group_name
+  virtual_network_name         = azurerm_virtual_network.vnet.name
+  remote_virtual_network_id    = each.value.id
+  allow_virtual_network_access = each.value.allow_virtual_network_access
+  allow_forwarded_traffic      = each.value.allow_forwarded_traffic
+  allow_gateway_transit        = each.value.allow_gateway_transit
+  use_remote_gateways          = each.value.use_remote_gateways
 }
 
-resource "azurerm_network_security_rule" "deny_all_outbound" {
-  count                       = length(var.subnets)
-  name                        = "DenyAllOutbound"
-  priority                    = 4096
-  direction                   = "Outbound"
-  access                      = "Deny"
-  protocol                    = "*"
-  source_port_range           = "*"
-  destination_port_range      = "*"
-  source_address_prefix       = "*"
-  destination_address_prefix  = "*"
-  resource_group_name         = var.resource_group_name
-  network_security_group_name = azurerm_network_security_group.nsg.*.name[count.index]
-}
