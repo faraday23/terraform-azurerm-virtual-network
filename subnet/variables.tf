@@ -1,7 +1,6 @@
-variable "naming_conventions_yaml_url" {
-  description = "url for naming conventions yaml file"
+variable "naming_rules" {
+  description = "naming conventions yaml file"
   type        = string
-  default     = "https://raw.githubusercontent.com/openrba/python-azure-naming/master/custom.yaml" 
 }
 
 variable "resource_group_name"{
@@ -35,9 +34,29 @@ variable "subnet_type" {
   type        = string
 }
 
-variable "subnet_cidr"{
-  description = "CIDR for subnet"
-  type        = string
+variable "cidrs" {
+  description = "CIDRs for subnet"
+  type        = list(string)
+}
+
+variable "allow_internet_outbound" {
+  description = "allow outbound traffic to internet"
+  type        = bool
+}
+
+variable "allow_lb_inbound" {
+  description = "allow inbound traffic from Azure Load Balancer"
+  type        = bool
+}
+
+variable "allow_vnet_inbound" {
+  description = "allow all inbound from virtual network"
+  type        = bool
+}
+
+variable "allow_vnet_outbound" {
+  description = "allow all outbound from virtual network"
+  type        = bool
 }
 
 # Subnet Options
